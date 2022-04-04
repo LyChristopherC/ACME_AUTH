@@ -1,8 +1,10 @@
+require('dotenv').config();
 const Sequelize = require('sequelize');
 const { STRING } = Sequelize;
 const config = {
   logging: false,
 };
+const jwt = require('jsonwebtoken');
 
 if (process.env.LOGGING) {
   delete config.logging;
@@ -19,7 +21,9 @@ const User = conn.define('user', {
 
 User.byToken = async (token) => {
   try {
-    const user = await User.findByPk(token);
+    const verifiedToken = jwt.verify(token, process.env.JWT);
+    // console.log(verifiedToken, 'Verified Token');
+    const user = await User.findByPk(verifiedToken.userId);
     if (user) {
       return user;
     }
@@ -41,7 +45,7 @@ User.authenticate = async ({ username, password }) => {
     },
   });
   if (user) {
-    return user.id;
+    return jwt.sign({ userId: user.id }, process.env.JWT);
   }
   const error = Error('bad credentials');
   error.status = 401;
