@@ -1,4 +1,5 @@
 require('dotenv').config();
+const bcrypt = require('bcrypt');
 const Sequelize = require('sequelize');
 const { STRING } = Sequelize;
 const config = {
@@ -18,6 +19,8 @@ const User = conn.define('user', {
   username: STRING,
   password: STRING,
 });
+
+//CREATE HOOKS HERE
 
 User.byToken = async (token) => {
   try {
@@ -41,10 +44,10 @@ User.authenticate = async ({ username, password }) => {
   const user = await User.findOne({
     where: {
       username,
-      password,
     },
   });
-  if (user) {
+  const match = await bcrypt.compare(password, user.password);
+  if (match) {
     return jwt.sign({ userId: user.id }, process.env.JWT);
   }
   const error = Error('bad credentials');
@@ -59,6 +62,11 @@ const syncAndSeed = async () => {
     { username: 'moe', password: 'moe_pw' },
     { username: 'larry', password: 'larry_pw' },
   ];
+  await User.create({
+    username: 'New User',
+    password: 'unhashedpassword',
+  });
+
   const [lucy, moe, larry] = await Promise.all(
     credentials.map((credential) => User.create(credential))
   );
@@ -70,6 +78,22 @@ const syncAndSeed = async () => {
     },
   };
 };
+
+User.beforeCreate(async (user, options) => {
+  const saltRounds = 10;
+  const myPlaintextPassword = user.password;
+  const hashed = await bcrypt.hash(myPlaintextPassword, saltRounds);
+  user.password = hashed;
+  console.log(user.password, 'HASHED PASSWORD~~~~');
+});
+
+// await Student.create({
+//   firstName: 'Jeff',
+//   lastName: 'Thompson',
+//   email: 'JeffT@gmail.com',
+//   gpa: 3.9,
+//   campusId: baruch.id,
+//  });
 
 module.exports = {
   syncAndSeed,
